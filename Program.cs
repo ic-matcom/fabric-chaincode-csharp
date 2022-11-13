@@ -17,7 +17,7 @@ namespace fabric_chaincode_csharp
             Server server = new Server
             {
                 Services = { Chaincode.BindService( new Shim.ChaincodeServer()) },
-                Ports = { new ServerPort("localhost", Port, ServerCredentials.Insecure) }
+                Ports = { new ServerPort("127.0.0.1", Port, ServerCredentials.Insecure) }
             };
             server.Start();
             
