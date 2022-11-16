@@ -13,7 +13,7 @@ namespace Shim
     }
     public class Handler
     {
-        public State State { get; set; }
+        public State State { get; private set; }
         public IAsyncStreamReader<ChaincodeMessage> RequestStream { get; set; }
         public IServerStreamWriter<ChaincodeMessage> ResponseStream { get; set; }
 
@@ -27,9 +27,107 @@ namespace Shim
             Chaincode = chaincode;
         }
 
-        public void HandleResponse(ChaincodeMessage chaincodeMessage) { }
-        public async Task HandleInit(ChaincodeMessage chaincodeMessage) {
-            ChaincodeInput input = new ChaincodeInput();
+        public void HandleMessage(ChaincodeMessage message)
+        {
+            switch (State)
+            {
+                case State.ready:
+                    HandleReady(message);
+                    break;
+                case State.established:
+                    HandleEstablished(message);
+                    break;
+                case State.created:
+                    HandleCreated(message);
+                    break;
+                default: break; //TODO: Send error message
+            }
+        }
+
+        public void HandleEstablished(ChaincodeMessage message)
+        {
+            if (message.Type != ChaincodeMessage.Types.Type.Ready)
+                throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
+
+            State = State.ready;
+        }
+
+        public void HandleCreated(ChaincodeMessage message)
+        {
+            if (message.Type != ChaincodeMessage.Types.Type.Registered)
+                throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
+            
+            State = State.established;
+        }
+
+        public void HandleTransaction(ChaincodeMessage chaincodeMessage)
+        {
+
+
+        }
+        public async void HandleResponse(ChaincodeMessage chaincodeMessage) {
+            ChaincodeInput input;
+            ChaincodeMessage errorMessage;
+
+            try
+            {
+                input = ChaincodeInput.Parser.ParseFrom(chaincodeMessage.Payload);
+            }
+            catch
+            {
+                Console.WriteLine(
+                 $"{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid} Incorrect payload format. Sending ERROR message back to peer");
+                errorMessage = new ChaincodeMessage
+                {
+                    Txid = chaincodeMessage.Txid,
+                    ChannelId = chaincodeMessage.ChannelId,
+                    Type = ChaincodeMessage.Types.Type.Error,
+                    Payload = chaincodeMessage.Payload
+                };
+
+                await ResponseStream.WriteAsync(errorMessage);
+                return;
+            }
+
+            ChaincodeStub stub;
+            try
+            {
+                stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input, chaincodeMessage.Proposal);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to construct a chaincode stub instance for the INVOKE message: {ex}");
+                errorMessage = new ChaincodeMessage
+                {
+                    Type = ChaincodeMessage.Types.Type.Error,
+                    Payload = ByteString.CopyFromUtf8(ex.Message),
+                    Txid = chaincodeMessage.Txid,
+                    ChannelId = chaincodeMessage.ChannelId
+                };
+                await ResponseStream.WriteAsync(errorMessage);
+                return;
+            }
+
+            Response response = await Chaincode.Invoke(stub);
+           
+            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INVOKE" +
+                                    "succeeded. Sending COMPLETED message back to peer");
+            ChaincodeMessage responseMessage = new ChaincodeMessage
+            {
+                Type = ChaincodeMessage.Types.Type.Completed,
+                Payload = response.ToByteString(),
+                Txid = chaincodeMessage.Txid,
+                ChannelId = chaincodeMessage.ChannelId,
+                ChaincodeEvent = stub.ChaincodeEvent
+            };
+
+            await ResponseStream.WriteAsync(responseMessage);
+        }
+
+
+        
+        public async void HandleInit(ChaincodeMessage chaincodeMessage) {
+            ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
             try
@@ -105,28 +203,6 @@ namespace Shim
 
             await ResponseStream.WriteAsync(responseMessage);
         }
-
-        internal Task<ByteString> HandleDeleteState(string empty, string key, string channelId, string txId)
-        {
-            throw new NotImplementedException();
-        }
-
-        internal Task<ByteString> HandlePutState(string empty, string key, ByteString value, string channelId, string txId)
-        {
-            throw new NotImplementedException();
-        }
-
-        internal Task<ByteString> HandleGetState(string empty, string key, string channelId, string txId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void HandleTransaction(ChaincodeMessage chaincodeMessage) {
-        
-
-        }
-
-
         public void HandleReady(ChaincodeMessage chaincodeMessage)
         {
             switch (chaincodeMessage.Type)
@@ -144,5 +220,23 @@ namespace Shim
                     break;
             }
         }
+
+
+        internal Task<ByteString> HandleDeleteState(string empty, string key, string channelId, string txId)
+        {
+            throw new NotImplementedException();
+        }
+
+        internal Task<ByteString> HandlePutState(string empty, string key, ByteString value, string channelId, string txId)
+        {
+            throw new NotImplementedException();
+        }
+
+        internal Task<ByteString> HandleGetState(string empty, string key, string channelId, string txId)
+        {
+            throw new NotImplementedException();
+        }
+
+       
     }
 }

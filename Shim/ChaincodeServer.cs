@@ -27,22 +27,7 @@ namespace Shim {
             {
                 ChaincodeMessage request = requestStream.Current;
 
-                if(handler.State == State.ready)
-                    handler.HandleReady(request);
-
-                //Update handler's state
-                switch (request.Type)
-                {
-                    case ChaincodeMessage.Types.Type.Registered:
-                        handler.State = State.established;
-                        break;
-                    case ChaincodeMessage.Types.Type.Ready:
-                        handler.State = State.ready;
-                        break;
-                    default: break;
-
-                }
-                Console.WriteLine("Request Payload ----->", request.Payload);   
+                handler.HandleMessage(request);
             }
         }
         public void Start(){
