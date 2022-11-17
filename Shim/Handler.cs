@@ -11,11 +11,13 @@ namespace Shim
         established,
         ready
     }
-    public class Handler
+    public class Handler: IHandler
     {
         public State State { get; private set; }
         public IAsyncStreamReader<ChaincodeMessage> RequestStream { get; set; }
-        public IServerStreamWriter<ChaincodeMessage> ResponseStream { get; set; }
+        public IServerStreamWriter<ChaincodeMessage> ResponseStream { get;}
+
+        private IMessageQueue _messageQueue;
 
         public IChaincode Chaincode { get; set; }
 
@@ -25,10 +27,12 @@ namespace Shim
             RequestStream = requestStream;
             ResponseStream = responseStream;
             Chaincode = chaincode;
+            _messageQueue = new MessageQueue(this);
         }
 
         public void HandleMessage(ChaincodeMessage message)
         {
+            Console.WriteLine("HANDLE MESSAGE");
             switch (State)
             {
                 case State.ready:
@@ -46,6 +50,7 @@ namespace Shim
 
         public void HandleEstablished(ChaincodeMessage message)
         {
+            Console.WriteLine("HANDLE ESTABLISHED");
             if (message.Type != ChaincodeMessage.Types.Type.Ready)
                 throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
 
@@ -54,18 +59,16 @@ namespace Shim
 
         public void HandleCreated(ChaincodeMessage message)
         {
+            Console.WriteLine("HANDLE CREATED");
             if (message.Type != ChaincodeMessage.Types.Type.Registered)
                 throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
             
             State = State.established;
         }
 
-        public void HandleTransaction(ChaincodeMessage chaincodeMessage)
+        public async Task HandleTransaction(ChaincodeMessage chaincodeMessage)
         {
-
-
-        }
-        public async void HandleResponse(ChaincodeMessage chaincodeMessage) {
+            Console.WriteLine($"HANDLE TRANSACTION: {chaincodeMessage.Txid}, PROPOSAL: {chaincodeMessage.Proposal}");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
@@ -109,7 +112,7 @@ namespace Shim
             }
 
             Response response = await Chaincode.Invoke(stub);
-           
+
             Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INVOKE" +
                                     "succeeded. Sending COMPLETED message back to peer");
             ChaincodeMessage responseMessage = new ChaincodeMessage
@@ -122,11 +125,16 @@ namespace Shim
             };
 
             await ResponseStream.WriteAsync(responseMessage);
+
+        }
+        public async void HandleResponse(ChaincodeMessage chaincodeMessage) {
+            
         }
 
 
         
         public async void HandleInit(ChaincodeMessage chaincodeMessage) {
+            Console.WriteLine("HANDLE INIT");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
@@ -205,6 +213,7 @@ namespace Shim
         }
         public void HandleReady(ChaincodeMessage chaincodeMessage)
         {
+            Console.WriteLine($"HANDLE READY, CHAINCODE MSG TYPE: {chaincodeMessage.Type}");
             switch (chaincodeMessage.Type)
             {
                 case ChaincodeMessage.Types.Type.Response:
@@ -220,23 +229,80 @@ namespace Shim
                     break;
             }
         }
+        private Task<T> AskPeerAndListen<T>(ChaincodeMessage message, MessageMethod method)
+        {
+            Console.WriteLine("ASK PEER AND LISTEN");
+            var taskCompletionSource = new TaskCompletionSource<T>();
 
+            var queueMessage = new QueueMessage<T>(message, method, taskCompletionSource);
+            _messageQueue.QueueMessage(queueMessage);
 
-        internal Task<ByteString> HandleDeleteState(string empty, string key, string channelId, string txId)
+            return taskCompletionSource.Task;
+        }
+
+        public Task<ByteString> HandleDeleteState(string collection, string key, string channelId, string txId)
+        {
+            Console.WriteLine("HANDLE DELETE STATE");
+            var payload = new DelState
+            {
+                Key = key,
+                Collection = collection
+            };
+            ChaincodeMessage message = new ChaincodeMessage()
+            {
+                Type = ChaincodeMessage.Types.Type.DelState,
+                Payload = ByteString.CopyFrom(payload.ToByteArray()),
+                ChannelId = channelId,
+                Txid = txId,
+            };
+
+            return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
+        }
+
+        public Task<ByteString> HandlePutState(string collection, string key, ByteString value, string channelId, string txId)
+        {
+            Console.WriteLine("HANDLE PUT STATE");
+            var payload = new PutState
+            {
+                Key = key,
+                Value = value,
+                Collection = collection
+            };
+            ChaincodeMessage message = new ChaincodeMessage()
+            {
+                Type = ChaincodeMessage.Types.Type.PutState,
+                Payload = ByteString.CopyFrom(payload.ToByteArray()),
+                ChannelId = channelId,
+                Txid = txId,
+            };
+
+            return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
+        }
+
+        public Task<ByteString> HandleGetState(string collection, string key, string channelId, string txId)
+        {
+            Console.WriteLine("HANDLE GET STATE");
+            var payload = new GetState
+            {
+                Key = key,
+                Collection = collection
+            };
+            ChaincodeMessage message = new ChaincodeMessage()
+            {
+                Type = ChaincodeMessage.Types.Type.GetState,
+                Payload = ByteString.CopyFrom(payload.ToByteArray()),
+                ChannelId = channelId,
+                Txid = txId,
+            };
+               
+            return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
+        }
+
+        
+
+        public object ParseResponse(ChaincodeMessage response, MessageMethod messageMethod)
         {
             throw new NotImplementedException();
         }
-
-        internal Task<ByteString> HandlePutState(string empty, string key, ByteString value, string channelId, string txId)
-        {
-            throw new NotImplementedException();
-        }
-
-        internal Task<ByteString> HandleGetState(string empty, string key, string channelId, string txId)
-        {
-            throw new NotImplementedException();
-        }
-
-       
     }
 }
