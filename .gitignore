@@ -394,3 +394,5 @@ healthchecksdb
 .vscode/launch.json
 .vscode/tasks.json
 /_gsdata_
+
+Properties
