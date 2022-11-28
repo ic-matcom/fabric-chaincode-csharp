@@ -37,6 +37,7 @@ namespace Shim
         Task<ByteString> DeleteState(string key);
         string CreateCompositeKey(string str, IEnumerable<string> attributes);
         (string str, IList<string> Attributes) SplitCompositeKey(string compositeKey);
+        ChaincodeFunctionParameterInformation GetFunctionAndParameters();
     }
     public interface IHandler
     {
@@ -45,24 +46,11 @@ namespace Shim
         Task<ByteString> HandleGetState(string collection, string key, string channelId, string txId);
         Task<ByteString> HandlePutState(string collection, string key, ByteString value, string channelId, string txId);
         Task<ByteString> HandleDeleteState(string collection, string key, string channelId, string txId);
-
-
-        //Task<Response> HandleInvokeChaincode(
-        //    string chaincodeName,
-        //    IEnumerable<ByteString> args,
-        //    string channelId,
-        //    string txId
-        //);
     }
 
     public interface IMessageQueue
     {
         Task QueueMessage(QueueMessage queueMessage);
         void HandleMessageResponse(ChaincodeMessage response);
-    }
-
-    public interface IMessageQueueFactory
-    {
-        IMessageQueue Create(IHandler handler);
     }
 }

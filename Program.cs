@@ -1,10 +1,4 @@
-using Grpc.Core;
-using Protos;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Shim;
 
 namespace fabric_chaincode_csharp
 {
@@ -12,21 +6,12 @@ namespace fabric_chaincode_csharp
     {
         static void Main(string[] args)
         {
-            const int Port = 9999;
+            string? address = Environment.GetEnvironmentVariable("CHAINCODE_SERVER_ADDRESS");
+            string? chaincodeId = Environment.GetEnvironmentVariable("CHAINCODE_ID");
 
-            Server server = new Server
-            {
-                Services = { Chaincode.BindService( new Shim.ChaincodeServer()) },
-                Ports = { new ServerPort("127.0.0.1", Port, ServerCredentials.Insecure) }
-            };
+            ChaincodeServer server = new ChaincodeServer(chaincodeId, address, new Test.AssetTransfer());
+
             server.Start();
-            
-
-            Console.WriteLine("server listening on port " + Port);
-            Console.WriteLine("Press any key to stop the server...");
-            Console.ReadKey();
-
-            server.ShutdownAsync().Wait();
         }
     }
 }
