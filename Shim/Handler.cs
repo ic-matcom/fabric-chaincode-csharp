@@ -14,17 +14,15 @@ namespace Shim
     public class Handler: IHandler
     {
         public State State { get; private set; }
-        public IAsyncStreamReader<ChaincodeMessage> RequestStream { get; set; }
         public IServerStreamWriter<ChaincodeMessage> ResponseStream { get;}
 
         private IMessageQueue _messageQueue;
 
         public IChaincode Chaincode { get; set; }
 
-        public Handler(IAsyncStreamReader<ChaincodeMessage> requestStream, IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode)
+        public Handler(IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode)
         {
             State = State.created;
-            RequestStream = requestStream;
             ResponseStream = responseStream;
             Chaincode = chaincode;
             _messageQueue = new MessageQueue(this);
@@ -68,7 +66,7 @@ namespace Shim
 
         public async Task HandleTransaction(ChaincodeMessage chaincodeMessage)
         {
-            Console.WriteLine($"HANDLE TRANSACTION: {chaincodeMessage.Txid}, PROPOSAL: {chaincodeMessage.Proposal}");
+            //Console.WriteLine($"HANDLE TRANSACTION: {chaincodeMessage.Txid}, PROPOSAL: {chaincodeMessage.Proposal}");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
@@ -113,8 +111,7 @@ namespace Shim
 
             Response response = await Chaincode.Invoke(stub);
 
-            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INVOKE" +
-                                    "succeeded. Sending COMPLETED message back to peer");
+            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INVOKE succeeded. Sending COMPLETED message back to peer");
             ChaincodeMessage responseMessage = new ChaincodeMessage
             {
                 Type = ChaincodeMessage.Types.Type.Completed,
@@ -127,13 +124,8 @@ namespace Shim
             await ResponseStream.WriteAsync(responseMessage);
 
         }
-        public async void HandleResponse(ChaincodeMessage chaincodeMessage) {
-            
-        }
-
-
         
-        public async void HandleInit(ChaincodeMessage chaincodeMessage) {
+        public async Task HandleInit(ChaincodeMessage chaincodeMessage) {
             Console.WriteLine("HANDLE INIT");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
@@ -179,13 +171,11 @@ namespace Shim
 
             Response response = await Chaincode.Init(stub);
 
-            Console.WriteLine($"[{chaincodeMessage.ChaincodeEvent}]-{chaincodeMessage.Txid} Calling chaincode INIT, " +
-                                   $"response status {response.Status}");
+            Console.WriteLine($"[{chaincodeMessage.ChaincodeEvent}]-{chaincodeMessage.Txid} Calling chaincode INIT, response status {response.Status}");
 
             if (response.Status >= 500)
             {
-                Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT " +
-                                 $"returned error response {response.Message}. " +
+                Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT returned error response {response.Message}. " +
                                  "Sending ERROR message back to peer");
 
                 errorMessage = new ChaincodeMessage
@@ -198,8 +188,7 @@ namespace Shim
                 await ResponseStream.WriteAsync(errorMessage);
                 return;
             }
-            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT" +
-                                    "succeeded. Sending COMPLETED message back to peer");
+            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT succeeded. Sending COMPLETED message back to peer");
             ChaincodeMessage responseMessage = new ChaincodeMessage
             {
                 Type = ChaincodeMessage.Types.Type.Completed,
@@ -211,21 +200,21 @@ namespace Shim
 
             await ResponseStream.WriteAsync(responseMessage);
         }
-        public void HandleReady(ChaincodeMessage chaincodeMessage)
+        public async void HandleReady(ChaincodeMessage chaincodeMessage)
         {
             Console.WriteLine($"HANDLE READY, CHAINCODE MSG TYPE: {chaincodeMessage.Type}");
             switch (chaincodeMessage.Type)
             {
                 case ChaincodeMessage.Types.Type.Response:
-                    HandleResponse(chaincodeMessage);
+                    _messageQueue.HandleMessageResponse(chaincodeMessage);
                     break;
 
                 case ChaincodeMessage.Types.Type.Init:
-                    HandleInit(chaincodeMessage);
+                     await HandleInit(chaincodeMessage);
                     break;
 
                 case ChaincodeMessage.Types.Type.Transaction:
-                    HandleTransaction(chaincodeMessage);
+                     await HandleTransaction(chaincodeMessage);
                     break;
             }
         }
@@ -256,7 +245,7 @@ namespace Shim
                 Txid = txId,
             };
 
-            return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
+            return AskPeerAndListen<ByteString>(message, MessageMethod.DelState);
         }
 
         public Task<ByteString> HandlePutState(string collection, string key, ByteString value, string channelId, string txId)
@@ -276,7 +265,7 @@ namespace Shim
                 Txid = txId,
             };
 
-            return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
+            return AskPeerAndListen<ByteString>(message, MessageMethod.PutState);
         }
 
         public Task<ByteString> HandleGetState(string collection, string key, string channelId, string txId)
@@ -302,7 +291,35 @@ namespace Shim
 
         public object ParseResponse(ChaincodeMessage response, MessageMethod messageMethod)
         {
-            throw new NotImplementedException();
+            Console.WriteLine(response.Type);
+            Console.WriteLine(messageMethod);
+            if (response.Type == ChaincodeMessage.Types.Type.Response)
+            {
+                Console.WriteLine(
+                    $"[{response.ChannelId}-{response.Txid}] Received {messageMethod} successful response");
+
+                switch (messageMethod)
+                {
+                    case MessageMethod.GetState:
+                        return response.Payload;
+
+                    default:
+                        return response.Payload;
+                }
+            }
+
+            if (response.Type == ChaincodeMessage.Types.Type.Error)
+            {
+                //_logger.LogInformation(
+                //    $"[{response.ChannelId}-{response.Txid}] Received {messageMethod} error response");
+                throw new Exception(response.Payload.ToStringUtf8());
+            }
+
+            var errorMessage = $"[{response.ChannelId}-{response.Txid}] Received incorrect chaincode " +
+                               $"in response to the {messageMethod} call: " +
+                               $"type={response.Type}, expecting \"RESPONSE\"";
+            //_logger.LogInformation(errorMessage);
+            throw new Exception(errorMessage);
         }
     }
 }

@@ -19,11 +19,13 @@ namespace Shim
         private SerializedIdentity Creator { get; set; }
         public ChaincodeEvent ChaincodeEvent { get; internal set; }
 
+        public IList<string> Args { get; }
+
         public ChaincodeStub(
             Handler handler,
             string channelId,
             string txId,
-            ChaincodeInput chaincodeInput, //for args && decorations (we don't use it yet)
+            ChaincodeInput chaincodeInput,
             SignedProposal signedProposal
         )
         {
@@ -31,6 +33,21 @@ namespace Shim
             ChannelId = channelId;
             TxId = txId;
             SignedProposal = signedProposal;
+            Args = chaincodeInput.Args.Select(entry => entry.ToStringUtf8()).ToList();
+        }
+
+        public ChaincodeFunctionParameterInformation GetFunctionAndParameters()
+        {
+            if (Args.Count < 1) return null;
+
+            var result = new ChaincodeFunctionParameterInformation
+            {
+                Function = Args.First()
+            };
+
+            result.Parameters.AddRange(Args.Skip(1));
+
+            return result;
         }
         public string GetChannelId()
         {

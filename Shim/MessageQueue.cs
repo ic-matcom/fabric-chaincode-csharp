@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using Google.Protobuf;
 using Protos;
 
 namespace Shim
@@ -30,7 +31,7 @@ namespace Shim
     {
         var messageTxContextId = response.ChannelId + response.Txid;
 
-        var message = GetCurrentMessage(messageTxContextId) as dynamic; // TODO: This needs to be done better
+        var message = GetCurrentMessage(messageTxContextId) as dynamic;
 
         HandleResponseMessage(message, messageTxContextId, response);
     }
@@ -86,7 +87,11 @@ namespace Shim
         try
         {
             var parsedResponse = _handler.ParseResponse(response, message.Method);
-            message.Success((T)parsedResponse);
+                //object parsedResponse = ChaincodeMessage.Parser.ParseFrom(response.Payload);
+                //object parsedResponse = response.Payload;
+            Console.WriteLine($"SUCCESS:{parsedResponse.ToString()}" );
+
+            message.Success((T) parsedResponse);
         }
         catch (Exception ex)
         {
