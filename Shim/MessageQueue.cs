@@ -4,6 +4,13 @@ using Protos;
 
 namespace Shim
 {
+    /// <summary>
+    /// This class handles queuing messages to be sent to the peer based on transaction id
+    /// The peer can access requests coming from different transactions concurrently but
+    /// cannot handle concurrent requests for the same transaction.Given the nature of asynchronouse
+    /// programming this could present a problem so this implementation provides a way to allow
+    /// code to perform concurrent request by serialising the calls to the peer.
+    /// </summary>
     public class MessageQueue : IMessageQueue
 {
     private readonly IHandler _handler;
@@ -14,9 +21,14 @@ namespace Shim
     public MessageQueue(IHandler handler)
     {
         _handler = handler;
-    }
+        }
 
-    public Task QueueMessage(QueueMessage queueMessage)
+        /// <summary>
+        /// Queue a message to be sent to the peer. If it is the first
+        /// message on the queue then send the message to the peer
+        /// </summary>
+        /// <param name="queueMessage">the message to queue</param>
+        public Task QueueMessage(QueueMessage queueMessage)
     {
         var messageQueue = _txQueues.GetOrAdd(queueMessage.MessageTxContextId, new ConcurrentQueue<QueueMessage>());
 
@@ -27,7 +39,15 @@ namespace Shim
         return Task.CompletedTask;
     }
 
-    public void HandleMessageResponse(ChaincodeMessage response)
+        /// <summary>
+        /// Handle a response to a message. This looks at the top of
+        /// the queue for the specific txn id to get the message this
+        /// response is associated with so it can drive the task waiting
+        /// on this message response. It then removes that message from the
+        /// queue and sends the next message on the queue if there is one.
+        /// </summary>
+        /// <param name="response">the received response</param>
+        public void HandleMessageResponse(ChaincodeMessage response)
     {
         var messageTxContextId = response.ChannelId + response.Txid;
 
@@ -36,7 +56,11 @@ namespace Shim
         HandleResponseMessage(message, messageTxContextId, response);
     }
 
-    private Task SendMessage(string messageTxContextId)
+        /// <summary>
+        /// send the current message to the peer.
+        /// </summary>
+        /// <param name="messageTxContextId">the transaction context id</param>
+        private Task SendMessage(string messageTxContextId)
     {
         var message = GetCurrentMessage(messageTxContextId);
 
@@ -51,9 +75,14 @@ namespace Shim
             message.Fail(ex);
             return Task.CompletedTask;
         }
-    }
+        }
 
-    private QueueMessage GetCurrentMessage(string messageTxContextId)
+        /// <summary>
+        /// Get the current message.
+        /// this returns the message at the top of the queue for the particular transaction.
+        /// </summary>
+        /// <param name="messageTxContextId">the transaction context id</param>
+        private QueueMessage GetCurrentMessage(string messageTxContextId)
     {
         if (_txQueues.TryGetValue(messageTxContextId, out var messageQueue) &&
             messageQueue.TryPeek(out var message))
@@ -63,7 +92,12 @@ namespace Shim
         return null;
     }
 
-    private void RemoveCurrentAndSendNextMessage(string messageTxContextId)
+        /// <summary>
+        /// Remove the current message and send the next message in the queue if there is one.
+        ///delete the queue if there are no more messages.
+        /// </summary>
+        /// <param name="messageTxContextId">the transaction context id</param>
+        private void RemoveCurrentAndSendNextMessage(string messageTxContextId)
     {
         if (!_txQueues.TryGetValue(messageTxContextId, out var messageQueue) || messageQueue.Count <= 0) return;
 
@@ -77,7 +111,6 @@ namespace Shim
 
         SendMessage(messageTxContextId);
     }
-
     private void HandleResponseMessage<T>(
         QueueMessage<T> message,
         string messageTxContextId,
@@ -87,9 +120,6 @@ namespace Shim
         try
         {
             var parsedResponse = _handler.ParseResponse(response, message.Method);
-                //object parsedResponse = ChaincodeMessage.Parser.ParseFrom(response.Payload);
-                //object parsedResponse = response.Payload;
-            Console.WriteLine($"SUCCESS:{parsedResponse.ToString()}" );
 
             message.Success((T) parsedResponse);
         }

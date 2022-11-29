@@ -169,6 +169,11 @@ namespace Shim
 
             return (str, attributes);
         }
+
+        /// <summary>
+        /// Validate attribute for unallowed characters 
+        /// </summary>
+        /// <param name="str">attribute value</param>
         private void ValidateCompositeKeyAttribute(string str)
         {
 

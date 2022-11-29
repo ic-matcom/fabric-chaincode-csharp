@@ -1,16 +1,13 @@
 ﻿using Protos;
 using Grpc.Core;
 using Google.Protobuf;
-using Google.Protobuf.WellKnownTypes;
 
 namespace Shim
 {
-    public enum State
-    {
-        created,
-        established,
-        ready
-    }
+
+    /// <summary>
+    /// Handles messages between peer and chaincode both in the chaincode server and client model.
+    /// </summary>
     public class Handler: IHandler
     {
         public State State { get; private set; }
@@ -30,9 +27,12 @@ namespace Shim
             _messageQueue = new MessageQueue(this);
         }
 
+
+        /// <summary>
+        /// handleMessage message handles loop for shim side of chaincode/peer stream.
+        /// </summary>
         public void HandleMessage(ChaincodeMessage message)
         {
-            Console.WriteLine("HANDLE MESSAGE");
             switch (State)
             {
                 case State.ready:
@@ -44,36 +44,43 @@ namespace Shim
                 case State.created:
                     HandleCreated(message);
                     break;
-                default: break; //TODO: Send error message
+                default: break;
             }
         }
 
+        /// <summary>
+        /// HandleEstablished handles messages received from the peer when the handler is in the "established" state.
+        /// </summary>
         public void HandleEstablished(ChaincodeMessage message)
         {
-            Console.WriteLine("HANDLE ESTABLISHED");
             if (message.Type != ChaincodeMessage.Types.Type.Ready)
                 throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
 
             State = State.ready;
         }
 
+        /// <summary>
+        /// HandleEstablished handles messages received from the peer when the handler is in the "established" state.
+        /// </summary>
         public void HandleCreated(ChaincodeMessage message)
         {
-            Console.WriteLine("HANDLE CREATED");
             if (message.Type != ChaincodeMessage.Types.Type.Registered)
                 throw new Exception($"{message.Txid} Chaincode cannot handle message {message.Type} while in state {State}");
             
             State = State.established;
         }
 
+        /// <summary>
+        /// HandleTransaction calls Invoke on the associated chaincode.
+        /// </summary>
         public async Task HandleTransaction(ChaincodeMessage chaincodeMessage)
         {
-            //Console.WriteLine($"HANDLE TRANSACTION: {chaincodeMessage.Txid}, PROPOSAL: {chaincodeMessage.Proposal}");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
             try
             {
+                // Get the function and args from Payload
                 input = ChaincodeInput.Parser.ParseFrom(chaincodeMessage.Payload);
             }
             catch
@@ -95,6 +102,7 @@ namespace Shim
             ChaincodeStub stub;
             try
             {
+                // Create the ChaincodeStub which the chaincode can use to callback
                 stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input, chaincodeMessage.Proposal);
             }
             catch (Exception ex)
@@ -124,11 +132,13 @@ namespace Shim
             };
 
             ResponseStream.WriteAsync(responseMessage).Wait(_context.CancellationToken);
-            // await ResponseStream.WriteAsync(responseMessage);
             
 
         }
-        
+
+        /// <summary>
+        /// handleInit calls the Init function of the associated chaincode.
+        /// </summary>
         public async Task HandleInit(ChaincodeMessage chaincodeMessage) {
             Console.WriteLine("HANDLE INIT");
             ChaincodeInput input;
@@ -136,6 +146,7 @@ namespace Shim
 
             try
             {
+                // Get the function and args from Payload
                 input = ChaincodeInput.Parser.ParseFrom(chaincodeMessage.Payload);
             }
             catch
@@ -157,6 +168,7 @@ namespace Shim
             ChaincodeStub stub;
             try
             {
+                // Create the ChaincodeStub which the chaincode can use to callback
                 stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input, chaincodeMessage.Proposal);
             }
             catch (Exception ex)
@@ -204,9 +216,13 @@ namespace Shim
 
             await ResponseStream.WriteAsync(responseMessage);
         }
+
+        /// <summary>
+        /// handleReady handles messages received from the peer when the handler is in the "ready" state.
+        /// </summary>
+        /// <param name="chaincodeMessage">chaincode message to handle</param>
         public async void HandleReady(ChaincodeMessage chaincodeMessage)
         {
-            Console.WriteLine($"HANDLE READY, CHAINCODE MSG TYPE: {chaincodeMessage.Type}");
             switch (chaincodeMessage.Type)
             {
                 case ChaincodeMessage.Types.Type.Response:
@@ -222,9 +238,10 @@ namespace Shim
                     break;
             }
         }
+
+
         private Task<T> AskPeerAndListen<T>(ChaincodeMessage message, MessageMethod method)
         {
-            Console.WriteLine("ASK PEER AND LISTEN");
             var taskCompletionSource = new TaskCompletionSource<T>();
 
             var queueMessage = new QueueMessage<T>(message, method, taskCompletionSource);
@@ -233,9 +250,15 @@ namespace Shim
             return taskCompletionSource.Task;
         }
 
+        /// <summary>
+        /// HandleDeleteState communicates with the peer to delete a key from the state in the ledger.
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="key">key of the asset to delete</param>
+        /// <param name="channelId">channel id</param>
+        /// <param name="txId">transaction id</param>
         public Task<ByteString> HandleDeleteState(string collection, string key, string channelId, string txId)
         {
-            Console.WriteLine("HANDLE DELETE STATE");
             var payload = new DelState
             {
                 Key = key,
@@ -252,9 +275,16 @@ namespace Shim
             return AskPeerAndListen<ByteString>(message, MessageMethod.DelState);
         }
 
+
+        /// <summary>
+        /// HandlePutState communicates with the peer to put state information into the ledger.
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="key">key of the asset being added to the ledger</param>
+        /// <param name="channelId">channel id</param>
+        /// <param name="txId">transaction id</param>
         public Task<ByteString> HandlePutState(string collection, string key, ByteString value, string channelId, string txId)
         {
-            Console.WriteLine("HANDLE PUT STATE");
             var payload = new PutState
             {
                 Key = key,
@@ -272,9 +302,15 @@ namespace Shim
             return AskPeerAndListen<ByteString>(message, MessageMethod.PutState);
         }
 
+        /// <summary>
+        /// handleGetState communicates with the peer to fetch the requested state information from the ledger.
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="key">key of the asset being consulted from the ledger</param>
+        /// <param name="channelId">channel id</param>
+        /// <param name="txId">transaction id</param>
         public Task<ByteString> HandleGetState(string collection, string key, string channelId, string txId)
         {
-            Console.WriteLine("HANDLE GET STATE");
             var payload = new GetState
             {
                 Key = key,
@@ -291,17 +327,10 @@ namespace Shim
             return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
         }
 
-        
-
         public object ParseResponse(ChaincodeMessage response, MessageMethod messageMethod)
         {
-            Console.WriteLine(response.Type);
-            Console.WriteLine(messageMethod);
             if (response.Type == ChaincodeMessage.Types.Type.Response)
             {
-                Console.WriteLine(
-                    $"[{response.ChannelId}-{response.Txid}] Received {messageMethod} successful response");
-
                 switch (messageMethod)
                 {
                     case MessageMethod.GetState:
@@ -314,15 +343,12 @@ namespace Shim
 
             if (response.Type == ChaincodeMessage.Types.Type.Error)
             {
-                //_logger.LogInformation(
-                //    $"[{response.ChannelId}-{response.Txid}] Received {messageMethod} error response");
                 throw new Exception(response.Payload.ToStringUtf8());
             }
 
             var errorMessage = $"[{response.ChannelId}-{response.Txid}] Received incorrect chaincode " +
                                $"in response to the {messageMethod} call: " +
                                $"type={response.Type}, expecting \"RESPONSE\"";
-            //_logger.LogInformation(errorMessage);
             throw new Exception(errorMessage);
         }
     }

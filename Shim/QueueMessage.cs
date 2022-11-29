@@ -3,13 +3,10 @@ using Protos;
 
 namespace Shim
 {
-    public enum MessageMethod
-    {
-        GetState,
-        InvokeChaincode,
-        PutState,
-        DelState
-    }
+
+    /// <summary>
+    /// Simple class to represent a message to be queued
+    /// </summary>
     public class QueueMessage
     {
         public QueueMessage(ChaincodeMessage message, MessageMethod method)
