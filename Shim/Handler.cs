@@ -103,11 +103,10 @@ namespace Shim
             try
             {
                 // Create the ChaincodeStub which the chaincode can use to callback
-                stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input, chaincodeMessage.Proposal);
+                stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to construct a chaincode stub instance for the INVOKE message: {ex}");
                 errorMessage = new ChaincodeMessage
                 {
                     Type = ChaincodeMessage.Types.Type.Error,
@@ -121,7 +120,6 @@ namespace Shim
 
             Response response = await Chaincode.Invoke(stub);
 
-            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INVOKE succeeded. Sending COMPLETED message back to peer");
             ChaincodeMessage responseMessage = new ChaincodeMessage
             {
                 Type = ChaincodeMessage.Types.Type.Completed,
@@ -327,29 +325,24 @@ namespace Shim
             return AskPeerAndListen<ByteString>(message, MessageMethod.GetState);
         }
 
+        /// <summary>
+        /// Decode the protobuf structure
+        /// before returning to the client code
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="messageMethod"></param>
         public object ParseResponse(ChaincodeMessage response, MessageMethod messageMethod)
         {
-            if (response.Type == ChaincodeMessage.Types.Type.Response)
+            if (response.Type == ChaincodeMessage.Types.Type.Response || response.Type == ChaincodeMessage.Types.Type.Error)
             {
-                switch (messageMethod)
-                {
-                    case MessageMethod.GetState:
-                        return response.Payload;
-
-                    default:
-                        return response.Payload;
-                }
+                return response.Payload;
             }
 
-            if (response.Type == ChaincodeMessage.Types.Type.Error)
-            {
-                throw new Exception(response.Payload.ToStringUtf8());
-            }
-
-            var errorMessage = $"[{response.ChannelId}-{response.Txid}] Received incorrect chaincode " +
-                               $"in response to the {messageMethod} call: " +
-                               $"type={response.Type}, expecting \"RESPONSE\"";
-            throw new Exception(errorMessage);
+            var errorMessage = $"[{response.ChannelId}-{response.Txid}] Received incorrect chaincode in response to the {messageMethod} call: " +
+                            $"type={response.Type}, expecting \"RESPONSE\"";
+            
+            return ByteString.CopyFromUtf8(errorMessage);
+            
         }
     }
 }

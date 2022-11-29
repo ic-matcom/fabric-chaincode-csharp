@@ -11,14 +11,10 @@ namespace Shim
     /// </summary>
     public class ChaincodeStub : IChaincodeStub
     {
-        private const char _minUnicodeRuneValue = '\u0000';
-        private const char _maxUnicodeRuneValue = '\u10ff';
-        private const char _compositeKeyNamespace = '\x00';
         private Handler _handler { get; set; }
         private Timestamp _txTimestamp { get; set; }
         private string _channelId { get; }
         private string _txId { get; }
-        private SignedProposal _signedProposal { get; }
         private SerializedIdentity _creator { get; set; }
         public ChaincodeEvent ChaincodeEvent { get; internal set; }
 
@@ -28,14 +24,12 @@ namespace Shim
             Handler handler,
             string channelId,
             string txId,
-            ChaincodeInput chaincodeInput,
-            SignedProposal signedProposal
+            ChaincodeInput chaincodeInput
         )
         {
             _handler = handler;
             _channelId = channelId;
             _txId = txId;
-            _signedProposal = signedProposal;
             Args = chaincodeInput.Args.Select(entry => entry.ToStringUtf8()).ToList();
         }
 
@@ -127,12 +121,12 @@ namespace Shim
         {
             ValidateCompositeKeyAttribute(objectType);
 
-            var compositeKey = _compositeKeyNamespace + objectType + _minUnicodeRuneValue;
+            var compositeKey = Constants.CompositeKeyNamespace + objectType + Constants.MinUnicodeRuneValue;
 
             foreach (var attribute in attributes)
             {
                 ValidateCompositeKeyAttribute(attribute);
-                compositeKey += attribute + _minUnicodeRuneValue;
+                compositeKey += attribute + Constants.MinUnicodeRuneValue;
             }
 
             return compositeKey;
@@ -148,10 +142,10 @@ namespace Shim
         /// <returns></returns>
         public (string str, IList<string> Attributes) SplitCompositeKey(string compositeKey)
         {
-            if (string.IsNullOrEmpty(compositeKey) || compositeKey[0] != _compositeKeyNamespace)
+            if (string.IsNullOrEmpty(compositeKey) || compositeKey[0] != Constants.CompositeKeyNamespace)
                 return ("", new List<string>());
 
-            var splitKey = compositeKey.Substring(1).Split(_minUnicodeRuneValue).ToList();
+            var splitKey = compositeKey.Substring(1).Split(Constants.MinUnicodeRuneValue).ToList();
             string str = "";
             var attributes = new List<string>();
 
@@ -176,15 +170,14 @@ namespace Shim
         /// <param name="str">attribute value</param>
         private void ValidateCompositeKeyAttribute(string str)
         {
-
             if (string.IsNullOrEmpty(str))
                 throw new Exception("not a valid utf8 string");
 
             foreach (var runeValue in str)
             {
-                if (runeValue == _minUnicodeRuneValue || runeValue == _maxUnicodeRuneValue)
+                if (runeValue == Constants.MinUnicodeRuneValue || runeValue == Constants.MaxUnicodeRuneValue)
                 {
-                    throw new Exception($"{_minUnicodeRuneValue} and {_maxUnicodeRuneValue} are not allowed in the input attribute of a composite key");
+                    throw new Exception($"{Constants.MinUnicodeRuneValue} and {Constants.MaxUnicodeRuneValue} are not allowed in the input attribute of a composite key");
                 }
             }
         }

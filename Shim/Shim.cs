@@ -3,8 +3,10 @@ using Protos;
 
 namespace Shim
 {
-   
-    public class Shim
+   /// <summary>
+   /// Handle response messages back to the peer.
+   /// </summary>
+    public static class Shim
     {
         public static Response Success()
         {

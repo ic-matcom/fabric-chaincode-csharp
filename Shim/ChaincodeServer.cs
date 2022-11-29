@@ -37,7 +37,6 @@ namespace Shim {
         /// <param name="requestStream">A stream of messages to be read</param>
         /// <param name="responseStream">A writable stream of messages that is used in server-side handlers</param>
         /// <param name="context">Context for a server side call</param>
-        /// <returns></returns>
         public override async Task Connect(IAsyncStreamReader<ChaincodeMessage> requestStream, IServerStreamWriter<ChaincodeMessage> responseStream, ServerCallContext context)
         {
             Console.WriteLine("CONNECT");
