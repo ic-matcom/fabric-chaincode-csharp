@@ -7,11 +7,24 @@ namespace Test
 {
     public class Asset
     {
-        public Asset(string value)
+        public Asset(string id, string name, string color, string size, string owner)
         {
-            Value = value;
+            ID = id;
+            NAME = name;
+            COLOR = color;
+            SIZE = size;
+            OWNER = owner;
+            // id = id;
+            // name = name;
+            // color = color;
+            // size = size;
+            // owner = owner;
         }
-        public string Value { get; set; }
+        public string ID { get; set; }
+        public string NAME { get; set; }
+        public string COLOR { get; set; }
+        public string SIZE { get; set; }
+        public string OWNER { get; set; }
     }
     public class AssetTransfer: IChaincode
     {
@@ -89,12 +102,12 @@ namespace Test
         {
             var assets = new List<Asset>()
             {
-                new Asset("Asset0"),
-                new Asset("Asset1"),
-                new Asset("Asset2"),
-                new Asset("Asset3"),
-                new Asset("Asset4"),
-                new Asset("Asset5"),
+                // new Asset("Asset0"),
+                // new Asset("Asset1"),
+                // new Asset("Asset2"),
+                // new Asset("Asset3"),
+                // new Asset("Asset4"),
+                // new Asset("Asset5"),
             };
             for (int i = 0; i < assets.Count; i++)
             {
@@ -109,15 +122,17 @@ namespace Test
         public async Task<ByteString> CreateAsset(IChaincodeStub stub, Parameters parameters)
         {
 
-            parameters.AssertCount(2);
-            string key = parameters[0];
-            string value = parameters[1];
+            parameters.AssertCount(5);
+            string id = parameters[0];
+            string name = parameters[1];
+            string color = parameters[2];
+            string size = parameters[3];
+            string owner = parameters[4];
 
-
-            var asset = new Asset(value);
+            var asset = new Asset(id, name, color, size, owner);
             string jsonString = JsonSerializer.Serialize(asset);
 
-            await stub.PutState(key, ByteString.CopyFromUtf8(jsonString));
+            await stub.PutState(id, ByteString.CopyFromUtf8(jsonString));
             
             return ByteString.Empty;
         }
@@ -145,7 +160,7 @@ namespace Test
 
             var serializedJson = await stub.GetState(key);
             var asset = JsonSerializer.Deserialize<Asset>(serializedJson.ToStringUtf8());
-            asset.Value = value;
+            asset.ID = value;
             
             string jsonString = JsonSerializer.Serialize(asset);
             var updatedAsset = await stub.PutState(key, ByteString.CopyFromUtf8(jsonString));
