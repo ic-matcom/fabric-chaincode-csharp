@@ -1,17 +1,35 @@
 ﻿using Google.Protobuf;
 using Protos;
 using Shim;
-using System.Text.Json;
-
+using Newtonsoft.Json;
 namespace Test
 {
     public class Asset
     {
-        public Asset(string value)
+        public Asset(string id, string color, int size, string owner, int appraisedValue)
         {
-            Value = value;
+            Id = id;
+            Color = color;
+            Size = size;
+            Owner = owner;
+            AppraisedValue = appraisedValue;
         }
-        public string Value { get; set; }
+
+
+        [JsonProperty("ID")]
+        public string Id { get; set; }
+
+        [JsonProperty("color")]
+        public string Color { get; set; }
+
+        [JsonProperty("size")]
+        public int Size { get; set; }
+
+        [JsonProperty("owner")]
+        public string Owner { get; set; }
+
+        [JsonProperty("appraisedValue")]
+        public int AppraisedValue { get; set; }
     }
     public class AssetTransfer: IChaincode
     {
@@ -81,7 +99,7 @@ namespace Test
                         return Shim.Shim.Error(ex);
                     }
                 default:
-                    throw new Exception("Function does not exist");
+                    return Shim.Shim.Error($"Function {f.Function} does not exist");
             }
         }
 
@@ -89,17 +107,17 @@ namespace Test
         {
             var assets = new List<Asset>()
             {
-                new Asset("Asset0"),
-                new Asset("Asset1"),
-                new Asset("Asset2"),
-                new Asset("Asset3"),
-                new Asset("Asset4"),
-                new Asset("Asset5"),
+                 new Asset("asset1", "blue",5,"Tomoko",  300),
+                 new Asset("asset2", "red", 5,"Brad",  400),
+                 new Asset("asset3", "green", 10,  "Jin Soo",  500),
+                 new Asset("asset4", "yellow", 10, "Max",  600),
+                 new Asset("asset5", "black", 15,  "Adriana",  700),
+                 new Asset("asset6", "white", 15,  "Michel",  800),
             };
             for (int i = 0; i < assets.Count; i++)
             {
-                string jsonString = JsonSerializer.Serialize(assets[i]);
-                await stub.PutState($"key{i}", ByteString.CopyFromUtf8(jsonString));
+                string jsonString = JsonConvert.SerializeObject(assets[i]);
+                await stub.PutState(assets[i].Id, ByteString.CopyFromUtf8(jsonString));
 
             }
 
@@ -109,15 +127,17 @@ namespace Test
         public async Task<ByteString> CreateAsset(IChaincodeStub stub, Parameters parameters)
         {
 
-            parameters.AssertCount(2);
-            string key = parameters[0];
-            string value = parameters[1];
+            parameters.AssertCount(5);
+            string id = parameters[0];
+            string color = parameters[1];
+            int size = int.Parse(parameters[2]);
+            string owner = parameters[3];
+            int appraisedValue = int.Parse(parameters[4]);
 
+            var asset = new Asset(id, color, size, owner, appraisedValue);
+            string jsonString = JsonConvert.SerializeObject(asset);
 
-            var asset = new Asset(value);
-            string jsonString = JsonSerializer.Serialize(asset);
-
-            await stub.PutState(key, ByteString.CopyFromUtf8(jsonString));
+            await stub.PutState(id, ByteString.CopyFromUtf8(jsonString));
             
             return ByteString.Empty;
         }
@@ -127,7 +147,7 @@ namespace Test
 
             string key = parameters[0];
             var asset =  await stub.GetState(key);
-            if (asset == null || asset.Length <= 0) throw new Exception($"Asset {key} does not exist.");
+            if (asset == null || asset.Length <= 0) return ByteString.CopyFromUtf8($"Asset {key} does not exist.");
 
             return asset;
         }
@@ -140,15 +160,27 @@ namespace Test
         }
         public async Task<ByteString> UpdateAsset(IChaincodeStub stub, Parameters parameters)
         {
-            string key = parameters[0];
-            string value = parameters[1];
+            string id = parameters[0];
+            string color = parameters[1];
+            int size = int.Parse(parameters[2]);
+            string owner = parameters[3];
+            int appraisedValue = int.Parse(parameters[4]);
 
-            var serializedJson = await stub.GetState(key);
-            var asset = JsonSerializer.Deserialize<Asset>(serializedJson.ToStringUtf8());
-            asset.Value = value;
+            var serializedJson = await stub.GetState(id);
+
+            if (serializedJson == null || serializedJson.Length <= 0)
+                return ByteString.CopyFromUtf8($"Asset {id} does not exist.");
+
+            var asset = JsonConvert.DeserializeObject<Asset>(serializedJson.ToStringUtf8());
             
-            string jsonString = JsonSerializer.Serialize(asset);
-            var updatedAsset = await stub.PutState(key, ByteString.CopyFromUtf8(jsonString));
+            asset.Id = id;
+            asset.Color = color;
+            asset.Size = size;  
+            asset.Owner = owner;    
+            asset.AppraisedValue = appraisedValue;
+            
+            string jsonString = JsonConvert.SerializeObject(asset);
+            await stub.PutState(id, ByteString.CopyFromUtf8(jsonString));
             
             return ByteString.Empty;
         }

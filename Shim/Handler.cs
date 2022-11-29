@@ -17,14 +17,16 @@ namespace Shim
         public IServerStreamWriter<ChaincodeMessage> ResponseStream { get;}
 
         private IMessageQueue _messageQueue;
+        private ServerCallContext _context;
 
         public IChaincode Chaincode { get; set; }
 
-        public Handler(IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode)
+        public Handler(IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode, ServerCallContext context)
         {
             State = State.created;
             ResponseStream = responseStream;
             Chaincode = chaincode;
+            _context = context;
             _messageQueue = new MessageQueue(this);
         }
 
@@ -121,7 +123,9 @@ namespace Shim
                 ChaincodeEvent = stub.ChaincodeEvent
             };
 
-            await ResponseStream.WriteAsync(responseMessage);
+            ResponseStream.WriteAsync(responseMessage).Wait(_context.CancellationToken);
+            // await ResponseStream.WriteAsync(responseMessage);
+            
 
         }
         
