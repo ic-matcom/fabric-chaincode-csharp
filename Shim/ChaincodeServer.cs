@@ -20,7 +20,7 @@ namespace Shim {
         {
             Console.WriteLine("CONNECT");
 
-            Handler handler = new Handler(responseStream, Chaincode);
+            Handler handler = new Handler(responseStream, Chaincode, context);
             var chaincodeID = new ChaincodeID() { Name= CCID};
 
 
