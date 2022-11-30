@@ -8,25 +8,39 @@ using Grpc.Core;
 namespace Shim
 {
 
-    // IChaincode  must be implemented by all chaincodes. The fabric runs
-    // the transactions by calling these functions as specified.
+    /// <summary>
+    /// IChaincode  must be implemented by all chaincodes. Fabric runs
+    ///  the transactions by calling these functions as specified.
+    /// </summary>
+
     public interface IChaincode
     {
-        // Init is called during Instantiate transaction after the chaincode container
-        // has been established for the first time, allowing the chaincode to
-        // initialize its internal data
+
+        /// <summary>
+        /// Init is called during Instantiate transaction after the chaincode container
+        /// has been established for the first time, allowing the chaincode to
+        /// initialize its internal data.
+        /// </summary>
+        /// <param name="stub"> Instance of ChaincodeStub to provide fuctions that interact with the ledger</param>
+
         Task<Response> Init(IChaincodeStub stub);
 
-        // Invoke is called to update or query the ledger in a proposal transaction.
-        // Updated state variables are not committed to the ledger until the
-        // transaction is committed.
+        /// <summary>
+        /// Invoke is called to update or query the ledger in a proposal transaction.
+        /// Updated state variables are not committed to the ledger until the
+        /// transaction is committed.
+        /// </summary>
+        /// <param name="stub">Instance of ChaincodeStub to provide fuctions that interact with the ledge</param>
         Task<Response> Invoke(IChaincodeStub stub);
     }
 
 
 
-    // IChaincodeStub is used by deployable chaincode apps to access and
-    // modify their ledgers
+    /// <summary>
+    /// IChaincodeStub groups functionalities which are used by deployable chaincode apps to access and
+    /// modify their ledgers.
+    /// Default implementation can be found in <code>ChaincodeStub</code
+    /// </summary>
     public interface IChaincodeStub
     {
         string GetChannelId();
@@ -39,6 +53,11 @@ namespace Shim
         (string str, IList<string> Attributes) SplitCompositeKey(string compositeKey);
         ChaincodeFunctionParameterInformation GetFunctionAndParameters();
     }
+
+    /// <summary>
+    /// IHandler groups functionalities which are used to manage communication between chaincode and peer.
+    /// Default implementation can be found in <code>Handler</code>.
+    /// </summary>
     public interface IHandler
     {
         public IServerStreamWriter<ChaincodeMessage> ResponseStream { get; }
@@ -48,6 +67,10 @@ namespace Shim
         Task<ByteString> HandleDeleteState(string collection, string key, string channelId, string txId);
     }
 
+    /// <summary>
+    /// IMessageQueue groups functionalities that help handle concurrent transaction proposals.
+    /// Default implementation can be found in <code>MessageQueue</code>
+    /// </summary>
     public interface IMessageQueue
     {
         Task QueueMessage(QueueMessage queueMessage);
