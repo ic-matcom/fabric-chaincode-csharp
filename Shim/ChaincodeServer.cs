@@ -25,10 +25,13 @@ namespace Shim {
         /// </summary>
         public IChaincode Chaincode { get; set; }
 
-        public ChaincodeServer(string chaincodeId , string address, IChaincode chaincode) {
+        public ILogger _logger { get; set; }
+
+        public ChaincodeServer(string chaincodeId , string address, IChaincode chaincode, ILogger logger) {
             CCID = chaincodeId;
             Address = address;
             Chaincode = chaincode;
+            _logger = logger;  
         }
 
         /// <summary>
@@ -39,15 +42,13 @@ namespace Shim {
         /// <param name="context">Context for a server side call</param>
         public override async Task Connect(IAsyncStreamReader<ChaincodeMessage> requestStream, IServerStreamWriter<ChaincodeMessage> responseStream, ServerCallContext context)
         {
-            Console.WriteLine("CONNECT");
 
             Handler handler = new Handler(responseStream, Chaincode, context);
             var chaincodeID = new ChaincodeID() { Name= CCID};
 
-
+            _logger.LogInformation("Sending Connect message to peer");
             await responseStream.WriteAsync(new ChaincodeMessage() { Type = ChaincodeMessage.Types.Type.Register, Payload = ByteString.CopyFrom(chaincodeID.ToByteArray()) });
 
-            Console.WriteLine("SENDING REGISTER MESSAGE");
             await Task.Run(async () =>
             {
                 while (await requestStream.MoveNext())
@@ -63,6 +64,11 @@ namespace Shim {
         /// Start the server
         /// </summary>
         public void Start(){
+            if (CCID == null)
+                throw new Exception("Chincode ID most be specified");
+            if (Address == null)
+                throw new Exception("Addres most be specified");
+
             string[] ip_port = Address.Split(':');
             string ip = ip_port[0];
             int port = int.Parse(ip_port[1]);
@@ -70,8 +76,22 @@ namespace Shim {
             Server server = new Server
             {
                 Services = { Protos.Chaincode.BindService(this) },
-                Ports = { new ServerPort(ip, port, ServerCredentials.Insecure) }
+
             };
+
+            string? key = Environment.GetEnvironmentVariable("CORE_TLS_CLIENT_KEY_PATH");
+            string? cert = Environment.GetEnvironmentVariable("CORE_TLS_CLIENT_CERT_PATH");
+
+            if (key == null || cert == null)
+                server.Ports.Add(new ServerPort(ip, port, ServerCredentials.Insecure));
+            else
+            {
+                var clientCaCerts = Environment.GetEnvironmentVariable("CORE_PEER_TLS_ROOTCERT_FILE");
+                var clientAuth = clientCaCerts != null;
+                var serverCredentials = new SslServerCredentials(new List<KeyCertificatePair> { new KeyCertificatePair(cert, key) }, clientCaCerts, clientAuth);
+                server.Ports.Add(new ServerPort(ip, port, serverCredentials));
+            }
+
             server.Start();
 
             Console.WriteLine("server listening on port " + port);
