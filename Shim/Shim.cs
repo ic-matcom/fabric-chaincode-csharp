@@ -3,12 +3,10 @@ using Protos;
 
 namespace Shim
 {
-    public enum ResponseCodes
-    {
-        Ok = 200,
-        Error = 500
-    }
-    public class Shim
+   /// <summary>
+   /// Handle response messages back to the peer.
+   /// </summary>
+    public static class Shim
     {
         public static Response Success()
         {
