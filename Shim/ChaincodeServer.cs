@@ -25,10 +25,13 @@ namespace Shim {
         /// </summary>
         public IChaincode Chaincode { get; set; }
 
-        public ChaincodeServer(string chaincodeId , string address, IChaincode chaincode) {
+        public ILogger _logger { get; set; }
+
+        public ChaincodeServer(string chaincodeId , string address, IChaincode chaincode, ILogger logger) {
             CCID = chaincodeId;
             Address = address;
             Chaincode = chaincode;
+            _logger = logger;  
         }
 
         /// <summary>
@@ -43,7 +46,7 @@ namespace Shim {
             Handler handler = new Handler(responseStream, Chaincode, context);
             var chaincodeID = new ChaincodeID() { Name= CCID};
 
-
+            _logger.LogInformation("Sending Connect message to peer");
             await responseStream.WriteAsync(new ChaincodeMessage() { Type = ChaincodeMessage.Types.Type.Register, Payload = ByteString.CopyFrom(chaincodeID.ToByteArray()) });
 
             await Task.Run(async () =>

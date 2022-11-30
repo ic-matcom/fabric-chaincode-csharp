@@ -3,6 +3,7 @@ using Grpc.Core;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Msp;
+using Microsoft.Extensions.Logging;
 
 namespace Shim
 {
@@ -20,11 +21,14 @@ namespace Shim
 
         public IList<string> Args { get; }
 
+        //public ILogger _logger { get; set; }
+
         public ChaincodeStub(
             Handler handler,
             string channelId,
             string txId,
             ChaincodeInput chaincodeInput
+            //ILogger _logger
         )
         {
             _handler = handler;
