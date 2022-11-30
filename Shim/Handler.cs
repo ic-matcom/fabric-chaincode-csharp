@@ -167,7 +167,7 @@ namespace Shim
             try
             {
                 // Create the ChaincodeStub which the chaincode can use to callback
-                stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input, chaincodeMessage.Proposal);
+                stub = new ChaincodeStub(this, chaincodeMessage.ChannelId, chaincodeMessage.Txid, input);
             }
             catch (Exception ex)
             {
