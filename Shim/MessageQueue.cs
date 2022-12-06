@@ -18,10 +18,12 @@ namespace Shim
     private readonly ConcurrentDictionary<string, ConcurrentQueue<QueueMessage>> _txQueues =
         new ConcurrentDictionary<string, ConcurrentQueue<QueueMessage>>();
 
-    public MessageQueue(IHandler handler)
+    public ILogger _logger { get; set; }
+    public MessageQueue(IHandler handler, ILogger logger)
     {
         _handler = handler;
-        }
+        _logger = logger;
+    }
 
         /// <summary>
         /// Queue a message to be sent to the peer. If it is the first
@@ -88,7 +90,7 @@ namespace Shim
             messageQueue.TryPeek(out var message))
             return message;
 
-       Console.WriteLine($"Failed to find a message for transaction context id {messageTxContextId}");
+       _logger.LogDebug($"Failed to find a message for transaction context id {messageTxContextId}");
         return null;
     }
 

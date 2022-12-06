@@ -25,7 +25,7 @@ namespace Shim {
         /// </summary>
         public IChaincode Chaincode { get; set; }
 
-        public ILogger _logger { get; set; }
+        private ILogger _logger { get; set; }
 
         public ChaincodeServer(string chaincodeId , string address, IChaincode chaincode, ILogger logger) {
             CCID = chaincodeId;
@@ -42,11 +42,11 @@ namespace Shim {
         /// <param name="context">Context for a server side call</param>
         public override async Task Connect(IAsyncStreamReader<ChaincodeMessage> requestStream, IServerStreamWriter<ChaincodeMessage> responseStream, ServerCallContext context)
         {
-
-            Handler handler = new Handler(responseStream, Chaincode, context);
+            _logger.LogInformation("Chaincode ID: " + CCID);
+            Handler handler = new Handler(responseStream, Chaincode, context, _logger);
             var chaincodeID = new ChaincodeID() { Name= CCID};
 
-            _logger.LogInformation("Sending Connect message to peer");
+            _logger.LogDebug("Sending REGISTER message to peer");
             await responseStream.WriteAsync(new ChaincodeMessage() { Type = ChaincodeMessage.Types.Type.Register, Payload = ByteString.CopyFrom(chaincodeID.ToByteArray()) });
 
             await Task.Run(async () =>
@@ -94,9 +94,8 @@ namespace Shim {
 
             server.Start();
 
-            Console.WriteLine("server listening on port " + port);
-            Console.WriteLine("Press any key to stop the server...");
-            Console.ReadKey();
+            _logger.LogInformation("Server listening on port " + port);
+            _logger.LogInformation("Press any key to stop the server...");
 
             server.ShutdownAsync().Wait();
         }

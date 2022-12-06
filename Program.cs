@@ -17,11 +17,7 @@ namespace fabric_chaincode_csharp
                     .AddConsole();
             });
             ILogger logger = loggerFactory.CreateLogger<Program>();
-            //logger.LogInformation("Info Log");
-            //logger.LogWarning("Warning Log");
-            //logger.LogError("Error Log");
-            //logger.LogCritical("Critical Log");
-            //Console.ReadLine();
+   
 
 
             string? address = Environment.GetEnvironmentVariable("CHAINCODE_SERVER_ADDRESS");
