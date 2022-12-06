@@ -18,13 +18,16 @@ namespace Shim
 
         public IChaincode Chaincode { get; set; }
 
-        public Handler(IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode, ServerCallContext context)
+        private ILogger _logger { get; set; }
+
+        public Handler(IServerStreamWriter<ChaincodeMessage> responseStream, IChaincode chaincode, ServerCallContext context, ILogger _logger)
         {
             State = State.created;
             ResponseStream = responseStream;
             Chaincode = chaincode;
             _context = context;
-            _messageQueue = new MessageQueue(this);
+            _messageQueue = new MessageQueue(this, _logger);
+            this._logger = _logger;
         }
 
 
@@ -44,7 +47,8 @@ namespace Shim
                 case State.created:
                     HandleCreated(message);
                     break;
-                default: break;
+                default:
+                    throw new Exception($"State {State} is not valid");
             }
         }
 
@@ -85,7 +89,7 @@ namespace Shim
             }
             catch
             {
-                Console.WriteLine(
+                _logger.LogInformation(
                  $"{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid} Incorrect payload format. Sending ERROR message back to peer");
                 errorMessage = new ChaincodeMessage
                 {
@@ -138,7 +142,6 @@ namespace Shim
         /// handleInit calls the Init function of the associated chaincode.
         /// </summary>
         public async Task HandleInit(ChaincodeMessage chaincodeMessage) {
-            Console.WriteLine("HANDLE INIT");
             ChaincodeInput input;
             ChaincodeMessage errorMessage;
 
@@ -149,7 +152,7 @@ namespace Shim
             }
             catch
             {
-                   Console.WriteLine(
+                   _logger.LogInformation(
                     $"{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid} Incorrect payload format. Sending ERROR message back to peer");
                 errorMessage = new ChaincodeMessage
                 {
@@ -171,7 +174,7 @@ namespace Shim
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to construct a chaincode stub instance for the INIT message: {ex}");
+                _logger.LogInformation($"Failed to construct a chaincode stub instance for the INIT message: {ex}");
                 errorMessage = new ChaincodeMessage
                 {
                     Type = ChaincodeMessage.Types.Type.Error,
@@ -185,11 +188,11 @@ namespace Shim
 
             Response response = await Chaincode.Init(stub);
 
-            Console.WriteLine($"[{chaincodeMessage.ChaincodeEvent}]-{chaincodeMessage.Txid} Calling chaincode INIT, response status {response.Status}");
+            _logger.LogInformation($"[{chaincodeMessage.ChaincodeEvent}]-{chaincodeMessage.Txid} Calling chaincode INIT, response status {response.Status}");
 
             if (response.Status >= 500)
             {
-                Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT returned error response {response.Message}. " +
+                _logger.LogInformation($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT returned error response {response.Message}. " +
                                  "Sending ERROR message back to peer");
 
                 errorMessage = new ChaincodeMessage
@@ -202,7 +205,7 @@ namespace Shim
                 await ResponseStream.WriteAsync(errorMessage);
                 return;
             }
-            Console.WriteLine($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT succeeded. Sending COMPLETED message back to peer");
+            _logger.LogInformation($"[{chaincodeMessage.ChannelId}-{chaincodeMessage.Txid}] Calling chaincode INIT succeeded. Sending COMPLETED message back to peer");
             ChaincodeMessage responseMessage = new ChaincodeMessage
             {
                 Type = ChaincodeMessage.Types.Type.Completed,
