@@ -1,14 +1,14 @@
-## 🚀 Deployment
+# gRPC in csharp
 
-### Overview
+## Overview
 This document explains how to generate gRPC code for C# from .proto files. 
 For more detail consult [gRPC Documentation](https://lisafc.github.io/grpc.github.io/docs/quickstart/csharp.html)
-### DOC dev
+## DOC dev
 
-#### Generate gRPC code
+### Generate gRPC code
 The Grpc.Tools NuGet package contains the protoc and protobuf C# plugin binaries you will need to generate the code.
 
-##### Obtaining the Grpc.Tools NuGet package
+#### Obtaining the Grpc.Tools NuGet package
 
 Using Visual Studio
 This example project already depends on the Grpc.Tools.1.8.x NuGet package, so it should be included in `examples/csharp/helloworld/packages` when the Greeter.sln solution is built from your IDE, or when you restore packages via /path/to/nuget restore on the command line.
@@ -51,6 +51,8 @@ Running the appropriate command for your OS regenerates the following files in t
     -- an abstract class Greeter.GreeterBase to inherit from when defining Greeter service implementations
     -- a class Greeter.GreeterClient that can be used to access remote Greeter instances
 
-https://github.com/grpc/grpc-dotnet/blob/master/examples
-https://binodmahto.medium.com/streaming-with-grpc-on-net-34a57be520a1
-https://www.mail-archive.com/grpc-io@googlegroups.com/msg05152.html
+# links
+
+- https://github.com/grpc/grpc-dotnet/blob/master/examples
+- https://binodmahto.medium.com/streaming-with-grpc-on-net-34a57be520a1
+- https://www.mail-archive.com/grpc-io@googlegroups.com/msg05152.html
